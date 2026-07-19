@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Analyst — Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b0a1a;
+      --ink: #f3f0ff;
+      --muted: #a39bb8;
+      --accent: #7c5cff;
+      --accent-2: #4f46e5;
+      --surface: #16132a;
+      --line: rgba(243, 240, 255, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", sans-serif;
+      color: var(--ink);
+      min-height: 100vh;
+      background:
+        radial-gradient(900px 420px at 80% -5%, rgba(124, 92, 255, 0.28), transparent 55%),
+        radial-gradient(700px 380px at 0% 20%, rgba(79, 70, 229, 0.18), transparent 50%),
+        var(--bg);
+    }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 2.75rem 1.5rem 4rem; }
+    .brand {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      font-size: clamp(2.75rem, 7vw, 3.75rem);
+      letter-spacing: -0.045em;
+      line-height: 1;
+      margin: 0 0 0.75rem;
+    }
+    .brand span { color: var(--accent); }
+    .lede {
+      font-size: 1.08rem;
+      line-height: 1.55;
+      color: var(--muted);
+      max-width: 32rem;
+      margin: 0;
+    }
+    .rule {
+      width: 2.75rem;
+      height: 4px;
+      border: 0;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      margin: 1.15rem 0 1.75rem;
+    }
+    .drop {
+      border: 1.5px dashed rgba(124, 92, 255, 0.55);
+      background: rgba(124, 92, 255, 0.08);
+      border-radius: 8px;
+      padding: 2rem 1.25rem;
+      text-align: center;
+      color: var(--muted);
+    }
+    .hint { margin-top: 0.85rem; color: var(--muted); font-size: 0.95rem; }
+    .section { margin: 2.1rem 0 0.75rem; }
+    .section h2 {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      font-size: 1.25rem;
+      margin: 0 0 0.3rem;
+    }
+    .section p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+    .analysis {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 1.15rem 1.25rem;
+      line-height: 1.65;
+    }
+    .analysis p { margin: 0 0 0.75rem; }
+    .analysis p:last-child { margin-bottom: 0; }
+    .meta {
+      display: flex; flex-wrap: wrap; gap: 0.65rem 1.35rem;
+      margin: 0.25rem 0 0.85rem; color: var(--muted); font-size: 0.88rem;
+    }
+    .meta strong { color: var(--ink); }
+    table {
+      width: 100%; border-collapse: collapse; font-size: 0.9rem;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+    }
+    th, td { text-align: left; padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    tr:last-child td { border-bottom: none; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .tabs button {
+      font-family: inherit; border: 1px solid var(--line); background: transparent;
+      padding: 0.4rem 0.85rem; border-radius: 8px; cursor: pointer; color: var(--muted);
+    }
+    .tabs button.active { background: var(--accent); border-color: var(--accent); color: white; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="tabs">
+      <button class="active" data-panel="empty">Empty state</button>
+      <button data-panel="filled">After upload</button>
+    </div>
+
+    <div id="empty" class="panel active">
+      <h1 class="brand">AI <span>Analyst</span></h1>
+      <p class="lede">
+        Upload a spreadsheet. Get a clean profile, plain-English insights,
+        and a place to ask follow-up questions — without sending raw rows to the model.
+      </p>
+      <hr class="rule" />
+      <div class="drop">
+        Drag and drop file here<br />
+        <span style="font-size:0.9rem">Limit 200MB per file · CSV, XLSX</span>
+      </div>
+      <p class="hint">Start with a <strong style="color:var(--ink)">.csv</strong> or <strong style="color:var(--ink)">.xlsx</strong> file.</p>
+    </div>
+
+    <div id="filled" class="panel">
+      <h1 class="brand">AI <span>Analyst</span></h1>
+      <p class="lede">
+        Upload a spreadsheet. Get a clean profile, plain-English insights,
+        and a place to ask follow-up questions — without sending raw rows to the model.
+      </p>
+      <hr class="rule" />
+      <div class="drop" style="padding:1rem; text-align:left; color:var(--ink)">
+        <strong>sales_q2.csv</strong> · 248 KB
+      </div>
+      <div class="section">
+        <h2>Insights</h2>
+        <p>What this dataset looks like, quality flags, and questions worth asking.</p>
+      </div>
+      <div class="analysis">
+        <p><strong>(a)</strong> This looks like quarterly sales records: order IDs, regions, revenue, and dates.</p>
+        <p><strong>(b)</strong> A few columns show missing values, and revenue has a small cluster of outliers.</p>
+        <p><strong>(c)</strong> Which regions drive the most revenue? How concentrated are outliers?</p>
+      </div>
+      <div class="section">
+        <h2>Data preview</h2>
+        <p>Showing the first 100 of 1,240 rows · 6 columns</p>
+      </div>
+      <div class="meta">
+        <span><strong>File</strong> sales_q2.csv</span>
+        <span><strong>Shape</strong> 1,240 × 6</span>
+      </div>
+      <table>
+        <thead><tr><th>Order ID</th><th>Region</th><th>Revenue</th><th>Date</th></tr></thead>
+        <tbody>
+          <tr><td>A-1001</td><td>Northeast</td><td>420.00</td><td>2026-04-02</td></tr>
+          <tr><td>A-1002</td><td>West</td><td>188.50</td><td>2026-04-03</td></tr>
+          <tr><td>A-1003</td><td>—</td><td>2,910.00</td><td>2026-04-03</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.tabs button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tabs button').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.panel).classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
