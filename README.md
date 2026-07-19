@@ -2,7 +2,7 @@
 
 Streamlit app that profiles CSV/Excel data and uses Gemini for insights and follow-up Q&A.
 
-**Live demo:** [data-analyst-ai-assistant.streamlit.app](https://data-analyst-ai-assistant.streamlit.app/)
+**Live demo:** [ai-analyst-assistants.streamlit.app](https://ai-analyst-assistants.streamlit.app/)
 
 ## Setup
 
