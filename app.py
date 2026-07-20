@@ -28,16 +28,15 @@ logger = logging.getLogger(__name__)
 
 STYLES = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap');
 
 :root {
-  --bg: #0b0a1a;
-  --ink: #f3f0ff;
-  --muted: #a39bb8;
-  --accent: #7c5cff;
-  --accent-2: #4f46e5;
-  --surface: #16132a;
-  --line: rgba(243, 240, 255, 0.12);
+  --bg: #F9F6F1;
+  --ink: #141413;
+  --muted: #6F6E69;
+  --accent: #C4A484;
+  --surface: #FFFCFA;
+  --line: rgba(20, 20, 19, 0.14);
   --radius: 8px;
 }
 
@@ -47,10 +46,7 @@ html, body, [class*="css"] {
 }
 
 .stApp {
-  background:
-    radial-gradient(900px 420px at 80% -5%, rgba(124, 92, 255, 0.28), transparent 55%),
-    radial-gradient(700px 380px at 0% 20%, rgba(79, 70, 229, 0.18), transparent 50%),
-    var(--bg);
+  background: var(--bg);
 }
 
 .stApp::before { display: none; }
@@ -65,16 +61,13 @@ html, body, [class*="css"] {
 
 .aa-hero { margin-bottom: 1.75rem; }
 .aa-brand {
-  font-family: "Space Grotesk", sans-serif;
-  font-weight: 700;
+  font-family: "Newsreader", Georgia, serif;
+  font-weight: 600;
   font-size: clamp(2.75rem, 7vw, 3.75rem);
-  letter-spacing: -0.045em;
-  line-height: 1;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
   color: var(--ink);
   margin: 0 0 0.75rem 0;
-}
-.aa-brand span {
-  color: var(--accent);
 }
 .aa-lede {
   font-size: 1.08rem;
@@ -84,21 +77,22 @@ html, body, [class*="css"] {
   margin: 0;
 }
 .aa-rule {
-  width: 2.75rem;
-  height: 4px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  margin: 1.15rem 0 0 0;
+  width: 100%;
+  height: 0;
+  background: none;
+  margin: 1.35rem 0 0 0;
   border: 0;
-  border-radius: 2px;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
 }
 
-.aa-section { margin: 2.1rem 0 0.75rem 0; }
+.aa-section { margin: 2.5rem 0 0.85rem 0; }
 .aa-section h2 {
-  font-family: "Space Grotesk", sans-serif;
-  font-weight: 700;
-  font-size: 1.25rem;
-  letter-spacing: -0.02em;
-  margin: 0 0 0.3rem 0;
+  font-family: "Newsreader", Georgia, serif;
+  font-weight: 600;
+  font-size: 1.4rem;
+  letter-spacing: -0.015em;
+  margin: 0 0 0.35rem 0;
   color: var(--ink);
 }
 .aa-section p {
@@ -110,7 +104,6 @@ html, body, [class*="css"] {
 div[data-testid="stVerticalBlockBorderWrapper"] {
   background: var(--surface) !important;
   border: 1px solid var(--line) !important;
-  border-left: 4px solid var(--accent) !important;
   border-radius: var(--radius) !important;
   padding: 0.45rem 0.65rem;
 }
@@ -134,13 +127,13 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 }
 
 [data-testid="stFileUploader"] section {
-  border: 1.5px dashed rgba(124, 92, 255, 0.55) !important;
-  background: rgba(124, 92, 255, 0.08) !important;
+  border: 1.5px dashed var(--line) !important;
+  background: var(--surface) !important;
   border-radius: var(--radius) !important;
 }
 [data-testid="stFileUploader"] section:hover {
-  border-color: var(--accent) !important;
-  background: rgba(124, 92, 255, 0.14) !important;
+  border-color: var(--ink) !important;
+  background: rgba(196, 164, 132, 0.12) !important;
 }
 
 div[data-testid="stExpander"] {
@@ -161,7 +154,6 @@ hr {
   margin: 1.75rem 0;
 }
 
-/* Streamlit text / widgets on dark */
 .stMarkdown, .stCaption, p, label, .stText { color: var(--ink); }
 [data-testid="stWidgetLabel"] p { color: var(--muted) !important; }
 
@@ -181,7 +173,7 @@ def render_hero() -> None:
     st.markdown(
         """
         <div class="aa-hero">
-          <h1 class="aa-brand">AI <span>Analyst</span></h1>
+          <h1 class="aa-brand">AI Analyst</h1>
           <p class="aa-lede">
             Upload a spreadsheet. Get a clean profile, plain-English insights,
             and a place to ask follow-up questions — without sending raw rows to the model.
