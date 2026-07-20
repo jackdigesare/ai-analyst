@@ -1,9 +1,14 @@
 import io
+import json
+import tomllib
 import unittest
 import zipfile
+from pathlib import Path
 from unittest import mock
 
 import app
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class UploadedFile(io.BytesIO):
@@ -45,6 +50,28 @@ class FileSafetyTests(unittest.TestCase):
 
         self.assertEqual(len(name), app.MAX_COLUMN_NAME_LENGTH)
         self.assertTrue(name.endswith("…"))
+
+
+class ServerConfigSafetyTests(unittest.TestCase):
+    def test_browser_request_protections_are_enabled(self) -> None:
+        with (ROOT / ".streamlit" / "config.toml").open("rb") as config_file:
+            server_config = tomllib.load(config_file)["server"]
+
+        self.assertIs(server_config["enableCORS"], True)
+        self.assertIs(server_config["enableXsrfProtection"], True)
+
+        devcontainer = json.loads(
+            (ROOT / ".devcontainer" / "devcontainer.json").read_text()
+        )
+        attach_commands = devcontainer.get("postAttachCommand", {})
+        commands = (
+            attach_commands.values()
+            if isinstance(attach_commands, dict)
+            else [attach_commands]
+        )
+        for command in commands:
+            self.assertNotIn("--server.enableCORS false", command)
+            self.assertNotIn("--server.enableXsrfProtection false", command)
 
 
 if __name__ == "__main__":
