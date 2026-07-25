@@ -24,6 +24,26 @@ class FileSafetyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "10 MB"):
             app.load_dataframe(uploaded)
 
+    def test_rejects_excessively_wide_csv_record_before_parsing(self) -> None:
+        pathological_row = b"," * app.MAX_DATAFRAME_COLUMNS
+        uploaded = UploadedFile(b"column\n" + pathological_row + b"\n", "data.csv")
+
+        with mock.patch.object(app.pd, "read_csv") as read_csv:
+            with self.assertRaisesRegex(ValueError, "500-column"):
+                app.load_dataframe(uploaded)
+
+        read_csv.assert_not_called()
+
+    def test_csv_width_check_allows_delimiters_and_newlines_in_quotes(self) -> None:
+        uploaded = UploadedFile(
+            b'first,second\n"value, across\nlines",ok\n',
+            "data.csv",
+        )
+
+        app.validate_csv_structure(uploaded)
+
+        self.assertEqual(uploaded.tell(), 0)
+
     def test_rejects_xlsx_with_excessive_expanded_size(self) -> None:
         content = io.BytesIO()
         with zipfile.ZipFile(content, "w", zipfile.ZIP_DEFLATED) as archive:
