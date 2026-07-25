@@ -23,6 +23,9 @@ MAX_DATAFRAME_ROWS = 250_000
 MAX_DATAFRAME_COLUMNS = 500
 MAX_COLUMN_NAME_LENGTH = 200
 MAX_CHAT_HISTORY_TURNS = 20
+CSV_QUOTE = ord('"')
+CSV_DELIMITER = ord(",")
+CSV_RECORD_ENDS = {ord("\r"), ord("\n")}
 
 logger = logging.getLogger(__name__)
 
@@ -241,12 +244,56 @@ def validate_xlsx_archive(uploaded_file) -> None:
         uploaded_file.seek(0)
 
 
+def validate_csv_structure(uploaded_file) -> None:
+    """Reject excessively wide CSV records before pandas allocates columns."""
+    uploaded_file.seek(0)
+    try:
+        data = uploaded_file.read(MAX_UPLOAD_BYTES + 1)
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise ValueError("The uploaded file exceeds the 10 MB safety limit.")
+
+        fields_in_record = 1
+        at_field_start = True
+        in_quotes = False
+        index = 0
+
+        while index < len(data):
+            byte = data[index]
+            if in_quotes:
+                if byte == CSV_QUOTE:
+                    if index + 1 < len(data) and data[index + 1] == CSV_QUOTE:
+                        index += 2
+                        continue
+                    in_quotes = False
+                index += 1
+                continue
+
+            if byte == CSV_QUOTE and at_field_start:
+                in_quotes = True
+            elif byte == CSV_DELIMITER:
+                fields_in_record += 1
+                if fields_in_record > MAX_DATAFRAME_COLUMNS:
+                    raise ValueError(
+                        "A CSV record exceeds the 500-column safety limit."
+                    )
+                at_field_start = True
+            elif byte in CSV_RECORD_ENDS:
+                fields_in_record = 1
+                at_field_start = True
+            else:
+                at_field_start = False
+            index += 1
+    finally:
+        uploaded_file.seek(0)
+
+
 def load_dataframe(uploaded_file) -> pd.DataFrame:
     if uploaded_file.size > MAX_UPLOAD_BYTES:
         raise ValueError("The uploaded file exceeds the 10 MB safety limit.")
 
     name = uploaded_file.name.lower()
     if name.endswith(".csv"):
+        validate_csv_structure(uploaded_file)
         df = pd.read_csv(uploaded_file, nrows=MAX_DATAFRAME_ROWS + 1)
     elif name.endswith(".xlsx"):
         validate_xlsx_archive(uploaded_file)
