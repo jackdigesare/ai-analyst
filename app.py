@@ -10,11 +10,10 @@ import os
 import re
 import zipfile
 from typing import Any, Iterator
-from xml.etree.ElementTree import ParseError
 
 import pandas as pd
 import streamlit as st
-from defusedxml.ElementTree import iterparse
+from defusedxml.ElementTree import ParseError, iterparse
 from defusedxml.common import DefusedXmlException
 from google import genai
 from google.genai import types
