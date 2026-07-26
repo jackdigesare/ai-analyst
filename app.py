@@ -7,11 +7,15 @@ import html
 import json
 import logging
 import os
+import re
 import zipfile
 from typing import Any, Iterator
+from xml.etree.ElementTree import ParseError
 
 import pandas as pd
 import streamlit as st
+from defusedxml.ElementTree import iterparse
+from defusedxml.common import DefusedXmlException
 from google import genai
 from google.genai import types
 
@@ -23,6 +27,7 @@ MAX_DATAFRAME_ROWS = 250_000
 MAX_DATAFRAME_COLUMNS = 500
 MAX_COLUMN_NAME_LENGTH = 200
 MAX_CHAT_HISTORY_TURNS = 20
+XLSX_CELL_REFERENCE_RE = re.compile(r"^([A-Za-z]+)[1-9][0-9]*$")
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +225,57 @@ def get_client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
+def xlsx_cell_column(reference: str) -> int:
+    """Return a one-based column index from an XLSX A1 cell reference."""
+    match = XLSX_CELL_REFERENCE_RE.fullmatch(reference)
+    if match is None:
+        raise ValueError("The XLSX file contains an invalid cell reference.")
+
+    column = 0
+    for letter in match.group(1).upper():
+        column = column * 26 + ord(letter) - ord("A") + 1
+    return column
+
+
+def validate_xlsx_worksheet_width(
+    archive: zipfile.ZipFile, entries: list[zipfile.ZipInfo]
+) -> None:
+    """Reject sparse XLSX sheets that expand past the dataframe column limit."""
+    for entry in entries:
+        if not (
+            entry.filename.startswith("xl/worksheets/")
+            and entry.filename.endswith(".xml")
+        ):
+            continue
+
+        current_column = 0
+        try:
+            with archive.open(entry) as worksheet:
+                for event, element in iterparse(
+                    worksheet, events=("start", "end")
+                ):
+                    tag = element.tag.rpartition("}")[-1]
+                    if event == "start" and tag == "row":
+                        current_column = 0
+                    elif event == "end" and tag == "c":
+                        reference = element.get("r")
+                        if reference is None:
+                            current_column += 1
+                        else:
+                            current_column = xlsx_cell_column(reference)
+                        if current_column > MAX_DATAFRAME_COLUMNS:
+                            raise ValueError(
+                                "An XLSX worksheet exceeds the 500-column safety limit."
+                            )
+
+                    if event == "end":
+                        element.clear()
+        except (ParseError, DefusedXmlException) as exc:
+            raise ValueError(
+                "The uploaded XLSX file contains invalid worksheet XML."
+            ) from exc
+
+
 def validate_xlsx_archive(uploaded_file) -> None:
     """Reject malformed or excessively expanded XLSX archives before parsing."""
     uploaded_file.seek(0)
@@ -235,6 +291,8 @@ def validate_xlsx_archive(uploaded_file) -> None:
 
             if any(entry.flag_bits & 0x1 for entry in entries):
                 raise ValueError("Encrypted XLSX files are not supported.")
+
+            validate_xlsx_worksheet_width(archive, entries)
     except zipfile.BadZipFile as exc:
         raise ValueError("The uploaded XLSX file is not a valid spreadsheet.") from exc
     finally:
