@@ -4,6 +4,7 @@ import zipfile
 from unittest import mock
 
 import app
+import openpyxl
 
 
 class UploadedFile(io.BytesIO):
@@ -39,6 +40,20 @@ class FileSafetyTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "not a valid spreadsheet"):
             app.validate_xlsx_archive(uploaded)
+
+    def test_rejects_sparse_wide_xlsx_before_parsing(self) -> None:
+        content = io.BytesIO()
+        workbook = openpyxl.Workbook()
+        workbook.active["A1"] = "header"
+        workbook.active.cell(row=20_001, column=501, value="trigger")
+        workbook.save(content)
+        uploaded = UploadedFile(content.getvalue(), "data.xlsx")
+
+        with mock.patch.object(app.pd, "read_excel") as read_excel:
+            with self.assertRaisesRegex(ValueError, "500-column"):
+                app.load_dataframe(uploaded)
+
+        read_excel.assert_not_called()
 
     def test_bounds_column_names_sent_to_the_model(self) -> None:
         name = app.safe_column_name("x" * (app.MAX_COLUMN_NAME_LENGTH + 1))
