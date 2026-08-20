@@ -24,9 +24,11 @@ MAX_XLSX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
 MAX_XLSX_ARCHIVE_FILES = 1_000
 MAX_DATAFRAME_ROWS = 250_000
 MAX_DATAFRAME_COLUMNS = 500
+MAX_DATAFRAME_CELLS = 5_000_000
 MAX_COLUMN_NAME_LENGTH = 200
 MAX_CHAT_HISTORY_TURNS = 20
-XLSX_CELL_REFERENCE_RE = re.compile(r"^([A-Za-z]+)[1-9][0-9]*$")
+XLSX_CELL_REFERENCE_RE = re.compile(r"^([A-Za-z]{1,3})([1-9][0-9]{0,6})$")
+XLSX_ROW_REFERENCE_RE = re.compile(r"^[1-9][0-9]{0,6}$")
 
 logger = logging.getLogger(__name__)
 
@@ -224,8 +226,8 @@ def get_client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
-def xlsx_cell_column(reference: str) -> int:
-    """Return a one-based column index from an XLSX A1 cell reference."""
+def xlsx_cell_coordinates(reference: str) -> tuple[int, int]:
+    """Return one-based row and column indexes from an XLSX A1 cell reference."""
     match = XLSX_CELL_REFERENCE_RE.fullmatch(reference)
     if match is None:
         raise ValueError("The XLSX file contains an invalid cell reference.")
@@ -233,13 +235,52 @@ def xlsx_cell_column(reference: str) -> int:
     column = 0
     for letter in match.group(1).upper():
         column = column * 26 + ord(letter) - ord("A") + 1
-    return column
+    return int(match.group(2)), column
 
 
-def validate_xlsx_worksheet_width(
+def xlsx_row_number(reference: str) -> int:
+    """Return a bounded one-based row index from an XLSX row reference."""
+    if XLSX_ROW_REFERENCE_RE.fullmatch(reference) is None:
+        raise ValueError("The XLSX file contains an invalid row reference.")
+    return int(reference)
+
+
+def checked_xlsx_shape(
+    row: int, column: int, max_row: int, max_column: int
+) -> tuple[int, int]:
+    """Update worksheet bounds, rejecting shapes that are unsafe to materialize."""
+    if row > MAX_DATAFRAME_ROWS + 1:
+        raise ValueError("An XLSX worksheet exceeds the 250,000-row safety limit.")
+    if column > MAX_DATAFRAME_COLUMNS:
+        raise ValueError("An XLSX worksheet exceeds the 500-column safety limit.")
+
+    max_row = max(max_row, row)
+    max_column = max(max_column, column)
+    if max_row * max_column > MAX_DATAFRAME_CELLS:
+        raise ValueError(
+            "An XLSX worksheet exceeds the "
+            f"{MAX_DATAFRAME_CELLS:,}-cell safety limit."
+        )
+    return max_row, max_column
+
+
+def xlsx_dimension_bounds(reference: str) -> tuple[int, int]:
+    """Return the bottom-right bounds of an XLSX worksheet dimension."""
+    coordinates = reference.split(":")
+    if len(coordinates) not in (1, 2):
+        raise ValueError("The XLSX file contains an invalid worksheet dimension.")
+
+    start_row, start_column = xlsx_cell_coordinates(coordinates[0])
+    end_row, end_column = xlsx_cell_coordinates(coordinates[-1])
+    if start_row > end_row or start_column > end_column:
+        raise ValueError("The XLSX file contains an invalid worksheet dimension.")
+    return end_row, end_column
+
+
+def validate_xlsx_worksheet_shape(
     archive: zipfile.ZipFile, entries: list[zipfile.ZipInfo]
 ) -> None:
-    """Reject sparse XLSX sheets that expand past the dataframe column limit."""
+    """Reject sparse XLSX sheets that expand past dataframe shape limits."""
     for entry in entries:
         if not (
             entry.filename.startswith("xl/worksheets/")
@@ -247,25 +288,46 @@ def validate_xlsx_worksheet_width(
         ):
             continue
 
+        current_row = 0
         current_column = 0
+        max_row = 0
+        max_column = 0
         try:
             with archive.open(entry) as worksheet:
                 for event, element in iterparse(
                     worksheet, events=("start", "end")
                 ):
                     tag = element.tag.rpartition("}")[-1]
-                    if event == "start" and tag == "row":
+                    if event == "start" and tag == "dimension":
+                        dimension_reference = element.get("ref")
+                        if dimension_reference is not None:
+                            dimension_row, dimension_column = xlsx_dimension_bounds(
+                                dimension_reference
+                            )
+                            max_row, max_column = checked_xlsx_shape(
+                                dimension_row,
+                                dimension_column,
+                                max_row,
+                                max_column,
+                            )
+                    elif event == "start" and tag == "row":
+                        row_reference = element.get("r")
+                        current_row = (
+                            current_row + 1
+                            if row_reference is None
+                            else xlsx_row_number(row_reference)
+                        )
                         current_column = 0
                     elif event == "end" and tag == "c":
                         reference = element.get("r")
                         if reference is None:
                             current_column += 1
+                            cell_row = current_row
                         else:
-                            current_column = xlsx_cell_column(reference)
-                        if current_column > MAX_DATAFRAME_COLUMNS:
-                            raise ValueError(
-                                "An XLSX worksheet exceeds the 500-column safety limit."
-                            )
+                            cell_row, current_column = xlsx_cell_coordinates(reference)
+                        max_row, max_column = checked_xlsx_shape(
+                            cell_row, current_column, max_row, max_column
+                        )
 
                     if event == "end":
                         element.clear()
@@ -291,7 +353,7 @@ def validate_xlsx_archive(uploaded_file) -> None:
             if any(entry.flag_bits & 0x1 for entry in entries):
                 raise ValueError("Encrypted XLSX files are not supported.")
 
-            validate_xlsx_worksheet_width(archive, entries)
+            validate_xlsx_worksheet_shape(archive, entries)
     except zipfile.BadZipFile as exc:
         raise ValueError("The uploaded XLSX file is not a valid spreadsheet.") from exc
     finally:
@@ -319,6 +381,10 @@ def load_dataframe(uploaded_file) -> pd.DataFrame:
         raise ValueError("The spreadsheet exceeds the 250,000-row safety limit.")
     if len(df.columns) > MAX_DATAFRAME_COLUMNS:
         raise ValueError("The spreadsheet exceeds the 500-column safety limit.")
+    if df.size > MAX_DATAFRAME_CELLS:
+        raise ValueError(
+            f"The spreadsheet exceeds the {MAX_DATAFRAME_CELLS:,}-cell safety limit."
+        )
     return df
 
 

@@ -55,6 +55,46 @@ class FileSafetyTests(unittest.TestCase):
 
         read_excel.assert_not_called()
 
+    def test_rejects_sparse_large_xlsx_shape_before_parsing(self) -> None:
+        content = io.BytesIO()
+        workbook = openpyxl.Workbook()
+        workbook.active["A1"] = "header"
+        workbook.active.cell(row=20_001, column=500, value="trigger")
+        workbook.save(content)
+        uploaded = UploadedFile(content.getvalue(), "data.xlsx")
+
+        with mock.patch.object(app.pd, "read_excel") as read_excel:
+            with self.assertRaisesRegex(ValueError, "5,000,000-cell"):
+                app.load_dataframe(uploaded)
+
+        read_excel.assert_not_called()
+
+    def test_rejects_forged_large_xlsx_dimension_before_parsing(self) -> None:
+        content = io.BytesIO()
+        workbook = openpyxl.Workbook()
+        workbook.active["A1"] = "header"
+        workbook.save(content)
+
+        rewritten = io.BytesIO()
+        with zipfile.ZipFile(content, "r") as source:
+            with zipfile.ZipFile(rewritten, "w", zipfile.ZIP_DEFLATED) as target:
+                for entry in source.infolist():
+                    data = source.read(entry)
+                    if entry.filename == "xl/worksheets/sheet1.xml":
+                        original = data
+                        data = data.replace(
+                            b'ref="A1:A1"', b'ref="A1:SF20001"'
+                        )
+                        self.assertNotEqual(data, original)
+                    target.writestr(entry, data)
+        uploaded = UploadedFile(rewritten.getvalue(), "data.xlsx")
+
+        with mock.patch.object(app.pd, "read_excel") as read_excel:
+            with self.assertRaisesRegex(ValueError, "5,000,000-cell"):
+                app.load_dataframe(uploaded)
+
+        read_excel.assert_not_called()
+
     def test_bounds_column_names_sent_to_the_model(self) -> None:
         name = app.safe_column_name("x" * (app.MAX_COLUMN_NAME_LENGTH + 1))
 
