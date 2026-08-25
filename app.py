@@ -24,6 +24,13 @@ MAX_DATAFRAME_COLUMNS = 500
 MAX_COLUMN_NAME_LENGTH = 200
 MAX_CHAT_HISTORY_TURNS = 20
 
+GEMINI_PRIVACY_NOTICE = (
+    "Privacy: AI analysis sends column names, data types, aggregate statistics "
+    "(including numeric minima, maxima, and means), and your chat messages to "
+    "Google Gemini. These statistics can reveal exact values, especially in small "
+    "or constant columns. Complete spreadsheet rows are not sent."
+)
+
 logger = logging.getLogger(__name__)
 
 STYLES = """
@@ -176,7 +183,7 @@ def render_hero() -> None:
           <h1 class="aa-brand">AI Analyst</h1>
           <p class="aa-lede">
             Upload a spreadsheet. Get a clean profile, plain-English insights,
-            and a place to ask follow-up questions — without sending raw rows to the model.
+            and a place to ask follow-up questions using a compact statistical profile.
           </p>
           <hr class="aa-rule" />
         </div>
@@ -465,12 +472,10 @@ def main() -> None:
     profiles = st.session_state.profiles
     summary_text = st.session_state.summary_text
 
-    st.info(
-        "Privacy: AI analysis sends column names, data types, aggregate statistics, "
-        "and your chat messages to Google Gemini. Raw spreadsheet rows are not sent."
-    )
+    st.info(GEMINI_PRIVACY_NOTICE)
     if not st.checkbox(
-        "I agree to send this metadata and my chat messages to Gemini.",
+        "I understand and agree to send this metadata, these statistics, "
+        "and my chat messages to Gemini.",
         key="gemini_consent",
     ):
         return
