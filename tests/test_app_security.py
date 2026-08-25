@@ -46,6 +46,10 @@ class FileSafetyTests(unittest.TestCase):
         self.assertEqual(len(name), app.MAX_COLUMN_NAME_LENGTH)
         self.assertTrue(name.endswith("…"))
 
+    def test_privacy_notice_discloses_exact_value_risk(self) -> None:
+        self.assertIn("minima, maxima, and means", app.GEMINI_PRIVACY_NOTICE)
+        self.assertIn("can reveal exact values", app.GEMINI_PRIVACY_NOTICE)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -16,8 +16,10 @@ Set a Gemini API key as `GEMINI_API_KEY` (or in `.streamlit/secrets.toml`).
 
 Uploads are limited to 10 MB, 250,000 rows, and 500 columns; expanded XLSX
 archives are capped at 50 MB. The app profiles files locally, then sends column
-names, data types, aggregate statistics, and chat messages to Google Gemini only
-after the user consents. Raw spreadsheet rows are not sent to Gemini.
+names, data types, aggregate statistics (including numeric minima, maxima, and
+means), and chat messages to Google Gemini only after the user consents. These
+statistics can reveal exact values, especially in small or constant columns;
+complete spreadsheet rows are not sent.
 
 ## Run
 
