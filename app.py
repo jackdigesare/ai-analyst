@@ -7,6 +7,7 @@ import html
 import json
 import logging
 import os
+import re
 import zipfile
 from typing import Any, Iterator
 
@@ -25,6 +26,10 @@ MAX_COLUMN_NAME_LENGTH = 200
 MAX_CHAT_HISTORY_TURNS = 20
 
 logger = logging.getLogger(__name__)
+
+_MARKDOWN_PUNCTUATION_RE = re.compile(
+    r"""([!"#$%&'()*+,\-./:;<=>?@\[\\\]^_`{|}~])"""
+)
 
 STYLES = """
 <style>
@@ -273,6 +278,18 @@ def safe_column_name(column: Any) -> str:
     return f"{name[: MAX_COLUMN_NAME_LENGTH - 1]}…"
 
 
+def model_output_to_safe_markdown(text: str) -> str:
+    """Render model output as text without active Markdown constructs."""
+    return _MARKDOWN_PUNCTUATION_RE.sub(r"\\\1", text)
+
+
+def safe_model_output_stream(chunks: Iterator[str], captured: list[str]) -> Iterator[str]:
+    """Capture raw model output while yielding text-safe display chunks."""
+    for chunk in chunks:
+        captured.append(chunk)
+        yield model_output_to_safe_markdown(chunk)
+
+
 def profile_dataframe(df: pd.DataFrame) -> list[dict[str, Any]]:
     """Compute per-column profiling stats. Never includes raw row values."""
     n_rows = len(df)
@@ -488,7 +505,7 @@ def main() -> None:
 
     section("Insights", "What this dataset looks like, quality flags, and questions worth asking.")
     with st.container(border=True):
-        st.markdown(st.session_state.analysis)
+        st.markdown(model_output_to_safe_markdown(st.session_state.analysis))
 
     section("Data preview", f"Showing the first 100 of {len(df):,} rows · {len(df.columns)} columns")
     safe_name = html.escape(uploaded.name)
@@ -510,7 +527,10 @@ def main() -> None:
 
     for turn in st.session_state.chat_history:
         with st.chat_message(turn["role"]):
-            st.markdown(turn["content"])
+            content = turn["content"]
+            if turn["role"] == "assistant":
+                content = model_output_to_safe_markdown(content)
+            st.markdown(content)
 
     question = st.chat_input("Ask about this dataset…", max_chars=1_000)
     if question:
@@ -519,15 +539,20 @@ def main() -> None:
             st.markdown(question)
 
         with st.chat_message("assistant"):
+            reply_chunks: list[str] = []
             try:
-                reply = st.write_stream(
-                    stream_chat_reply(
-                        client,
-                        summary_text,
-                        question,
-                        st.session_state.chat_history[:-1][-MAX_CHAT_HISTORY_TURNS:],
+                st.write_stream(
+                    safe_model_output_stream(
+                        stream_chat_reply(
+                            client,
+                            summary_text,
+                            question,
+                            st.session_state.chat_history[:-1][-MAX_CHAT_HISTORY_TURNS:],
+                        ),
+                        reply_chunks,
                     )
                 )
+                reply = "".join(reply_chunks)
             except Exception:
                 logger.exception("Gemini chat request failed")
                 reply = "Sorry, Gemini could not answer right now. Please try again later."
