@@ -19,6 +19,15 @@ archives are capped at 50 MB. The app profiles files locally, then sends column
 names, data types, aggregate statistics, and chat messages to Google Gemini only
 after the user consents. Raw spreadsheet rows are not sent to Gemini.
 
+## Deployment security
+
+Each deployment uses one server-side Gemini API key. The app does not
+authenticate users or enforce per-user/IP rate limits, so protect public
+deployments with hosting-level authentication, an allowlist, or infrastructure
+rate limiting. Configure provider quotas or budget alerts as an additional
+safeguard. Per-session limits alone are not an abuse control because clients can
+start new sessions.
+
 ## Run
 
 ```bash
