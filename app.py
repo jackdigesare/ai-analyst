@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import html
 import json
 import logging
 import os
 import zipfile
+import zlib
 from typing import Any, Iterator
 
 import pandas as pd
@@ -19,6 +21,7 @@ MODEL = "gemini-3.5-flash"
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_XLSX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
 MAX_XLSX_ARCHIVE_FILES = 1_000
+XLSX_DECOMPRESSION_CHUNK_BYTES = 64 * 1024
 MAX_DATAFRAME_ROWS = 250_000
 MAX_DATAFRAME_COLUMNS = 500
 MAX_COLUMN_NAME_LENGTH = 200
@@ -220,6 +223,57 @@ def get_client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
+def validate_xlsx_decompressed_size(
+    archive: zipfile.ZipFile,
+    entries: list[zipfile.ZipInfo],
+) -> None:
+    """Bound actual decompression even when ZIP size metadata is forged."""
+    observed_total = 0
+
+    for entry in entries:
+        remaining = MAX_XLSX_UNCOMPRESSED_BYTES - observed_total
+        probe_entry = copy.copy(entry)
+        # ZipExtFile otherwise trusts the declared size and can allocate far more
+        # than that size while expanding a forged DEFLATE stream. read1() keeps
+        # each expansion bounded; the temporary size allows us to observe up to
+        # one byte beyond the remaining archive budget.
+        probe_entry.file_size = remaining + 1
+        observed_entry = 0
+
+        try:
+            with archive.open(probe_entry) as member:
+                while True:
+                    read_size = min(
+                        XLSX_DECOMPRESSION_CHUNK_BYTES,
+                        remaining - observed_entry + 1,
+                    )
+                    chunk = member.read1(read_size)
+                    if not chunk:
+                        break
+                    observed_entry += len(chunk)
+                    if observed_entry > remaining:
+                        raise ValueError(
+                            "The XLSX file expands beyond the 50 MB safety limit."
+                        )
+        except ValueError:
+            raise
+        except (
+            EOFError,
+            OSError,
+            RuntimeError,
+            NotImplementedError,
+            zipfile.BadZipFile,
+            zlib.error,
+        ) as exc:
+            raise ValueError(
+                "The XLSX file contains invalid or unsafe compressed data."
+            ) from exc
+
+        if observed_entry != entry.file_size:
+            raise ValueError("The XLSX file contains inconsistent ZIP size metadata.")
+        observed_total += observed_entry
+
+
 def validate_xlsx_archive(uploaded_file) -> None:
     """Reject malformed or excessively expanded XLSX archives before parsing."""
     uploaded_file.seek(0)
@@ -235,6 +289,12 @@ def validate_xlsx_archive(uploaded_file) -> None:
 
             if any(entry.flag_bits & 0x1 for entry in entries):
                 raise ValueError("Encrypted XLSX files are not supported.")
+
+            supported_compression = {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}
+            if any(entry.compress_type not in supported_compression for entry in entries):
+                raise ValueError("The XLSX file uses an unsupported compression method.")
+
+            validate_xlsx_decompressed_size(archive, entries)
     except zipfile.BadZipFile as exc:
         raise ValueError("The uploaded XLSX file is not a valid spreadsheet.") from exc
     finally:
